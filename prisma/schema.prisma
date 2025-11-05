@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ================ ENUMS ================
+enum Role {
+  ADMIN
+  TEACHER
+  APPLICANT
+}
+
+enum StatusPpdb {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  EXCUSED
+}
+
+enum RoomType {
+  CLASSROOM
+  LABORATORY
+  PRACTICE
+  LIBRARY
+  OFFICE
+  HALL
+  TOILET
+  OTHER
+}
+
+// ================ MODEL UTAMA ================
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String // hashed
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relasi ke role spesifik — HANYA definisi relasi, TANPA fields/references
+  admin   Admin? @relation
+  adminId Int?   @unique
+
+  teacher   Teacher? @relation
+  teacherId Int?     @unique
+
+  applicant   Applicant? @relation
+  applicantId Int?       @unique
+}
+
+// ================ ADMIN ================
+model Admin {
+  id     Int    @id @default(autoincrement())
+  name   String
+  nip    String @unique
+  user   User   @relation(fields: [userId], references: [id])
+  userId Int    @unique
+}
+
+// ================ GURU ================
+model Teacher {
+  id        Int      @id @default(autoincrement())
+  name      String
+  nip       String   @unique
+  phone     String?
+  address   String?
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int      @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  schedules  Schedule[]
+  Attendance Attendance[]
+}
+
+// ================ CALON SISWA (PPDB) ================
+model Applicant {
+  id           Int        @id @default(autoincrement())
+  name         String
+  nisn         String     @unique
+  phone        String
+  address      String
+  birthDate    DateTime
+  schoolOrigin String
+  status       StatusPpdb @default(PENDING)
+  registeredAt DateTime   @default(now())
+  documents    String? // JSON string or comma-separated paths
+  feedback     String?
+
+  user   User? @relation(fields: [userId], references: [id])
+  userId Int?  @unique
+
+  attendances Attendance[]
+}
+
+// ================ ABSENSI ================
+model Attendance {
+  id     Int              @id @default(autoincrement())
+  date   DateTime         @default(now())
+  status AttendanceStatus @default(PRESENT)
+
+  applicant   Applicant @relation(fields: [applicantId], references: [id])
+  applicantId Int
+
+  teacher   Teacher @relation(fields: [teacherId], references: [id])
+  teacherId Int
+}
+
+// ================ JADWAL ================
+model Schedule {
+  id      Int    @id @default(autoincrement())
+  day     Int // 1=Monday, ..., 6=Saturday
+  period  Int // Period number (1st hour, 2nd hour, etc.)
+  subject String
+
+  room   MapRoom? @relation(fields: [roomId], references: [id])
+  roomId Int?
+
+  teacher   Teacher @relation(fields: [teacherId], references: [id])
+  teacherId Int
+}
+
+// ================ FEEDBACK (dari publik) ================
+model Feedback {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String?
+  message   String
+  createdAt DateTime @default(now())
+}
+
+// ================ DENAH SEKOLAH (CAMPUS MAP) ================
+model CampusMap {
+  id         Int      @id @default(autoincrement())
+  name       String   @default("Denah Utama")
+  svgPath    String // e.g., "/uploads/maps/school.svg"
+  uploadedAt DateTime @default(now())
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  rooms MapRoom[]
+}
+
+// ================ RUANGAN DI DENAH ================
+model MapRoom {
+  id          Int      @id @default(autoincrement())
+  roomId      String // Harus sesuai dengan `id` elemen di SVG (e.g., "class-101")
+  name        String
+  type        RoomType @default(OTHER)
+  capacity    Int      @default(0)
+  description String?
+  metadata    Json? // Optional: { x: 120, y: 200, color: "#3b82f6" }
+
+  campusMap   CampusMap @relation(fields: [campusMapId], references: [id])
+  campusMapId Int
+
+  schedules Schedule[]
+}
