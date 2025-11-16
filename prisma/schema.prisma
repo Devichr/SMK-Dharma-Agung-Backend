@@ -56,6 +56,10 @@ model User {
 
   applicant   Applicant? @relation
   applicantId Int?       @unique
+
+  students Student[]
+
+  staffs Staff[]
 }
 
 // ================ ADMIN ================
@@ -103,6 +107,36 @@ model Applicant {
   attendances Attendance[]
 }
 
+model Student {
+  id            Int       @id @default(autoincrement())
+  name          String
+  nisn          String    @unique
+  phone         String
+  address       String
+  birthDate     DateTime
+  schoolOrigin  String    // Asal sekolah SMP
+  userId        Int?      @unique
+  user          User?     @relation(fields: [userId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relasi ke absensi, jadwal, dll (jika perlu)
+  attendances   Attendance[]
+}
+
+model Staff {
+  id        Int      @id @default(autoincrement())
+  name      String
+  employeeId String  @unique
+  position  String?
+  phone     String?
+  address   String?
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    Int?     @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // ================ ABSENSI ================
 model Attendance {
   id     Int              @id @default(autoincrement())
@@ -114,6 +148,8 @@ model Attendance {
 
   teacher   Teacher @relation(fields: [teacherId], references: [id])
   teacherId Int
+
+  students Student[]
 }
 
 // ================ JADWAL ================
