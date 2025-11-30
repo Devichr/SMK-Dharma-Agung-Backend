@@ -1,0 +1,195 @@
+//// ------------------------------------------------------
+//// THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+//// ------------------------------------------------------
+
+Table User {
+  id Int [pk, increment]
+  email String [unique, not null]
+  password String [not null]
+  role Role [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  admin Admin
+  adminId Int [unique]
+  teacher Teacher
+  teacherId Int [unique]
+  applicant Applicant
+  applicantId Int [unique]
+  students Student [not null]
+  staffs Staff [not null]
+}
+
+Table Admin {
+  id Int [pk, increment]
+  name String [not null]
+  nip String [unique, not null]
+  user User [not null]
+  userId Int [unique, not null]
+}
+
+Table Teacher {
+  id Int [pk, increment]
+  name String [not null]
+  nip String [unique, not null]
+  phone String
+  address String
+  user User [not null]
+  userId Int [unique, not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  schedules Schedule [not null]
+  Attendance Attendance [not null]
+}
+
+Table Applicant {
+  id Int [pk, increment]
+  name String [not null]
+  nisn String [unique, not null]
+  phone String [not null]
+  address String [not null]
+  birthDate DateTime [not null]
+  schoolOrigin String [not null]
+  status StatusPpdb [not null, default: 'PENDING']
+  registeredAt DateTime [default: `now()`, not null]
+  documents String
+  feedback String
+  user User
+  userId Int [unique]
+  attendances Attendance [not null]
+}
+
+Table Student {
+  id Int [pk, increment]
+  name String [not null]
+  nisn String [unique, not null]
+  phone String [not null]
+  address String [not null]
+  birthDate DateTime [not null]
+  schoolOrigin String [not null]
+  userId Int [unique]
+  user User
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  attendances Attendance [not null]
+}
+
+Table Staff {
+  id Int [pk, increment]
+  name String [not null]
+  employeeId String [unique, not null]
+  position String
+  phone String
+  address String
+  user User
+  userId Int [unique]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table Attendance {
+  id Int [pk, increment]
+  date DateTime [default: `now()`, not null]
+  status AttendanceStatus [not null, default: 'PRESENT']
+  applicant Applicant [not null]
+  applicantId Int [not null]
+  teacher Teacher [not null]
+  teacherId Int [not null]
+  students Student [not null]
+}
+
+Table Schedule {
+  id Int [pk, increment]
+  day Int [not null]
+  period Int [not null]
+  subject String [not null]
+  room MapRoom
+  roomId Int
+  teacher Teacher [not null]
+  teacherId Int [not null]
+}
+
+Table Feedback {
+  id Int [pk, increment]
+  name String [not null]
+  email String
+  message String [not null]
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table CampusMap {
+  id Int [pk, increment]
+  name String [not null, default: 'Denah Utama']
+  svgPath String [not null]
+  uploadedAt DateTime [default: `now()`, not null]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  rooms MapRoom [not null]
+}
+
+Table MapRoom {
+  id Int [pk, increment]
+  roomId String [not null]
+  name String [not null]
+  type RoomType [not null, default: 'OTHER']
+  capacity Int [not null, default: 0]
+  description String
+  metadata Json
+  campusMap CampusMap [not null]
+  campusMapId Int [not null]
+  schedules Schedule [not null]
+}
+
+Table AttendanceToStudent {
+  attendancesId Int [ref: > Attendance.id]
+  studentsId Int [ref: > Student.id]
+}
+
+Enum Role {
+  ADMIN
+  TEACHER
+  APPLICANT
+}
+
+Enum StatusPpdb {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+Enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  EXCUSED
+}
+
+Enum RoomType {
+  CLASSROOM
+  LABORATORY
+  PRACTICE
+  LIBRARY
+  OFFICE
+  HALL
+  TOILET
+  OTHER
+}
+
+Ref: Admin.userId - User.id
+
+Ref: Teacher.userId - User.id
+
+Ref: Applicant.userId - User.id
+
+Ref: Student.userId > User.id
+
+Ref: Staff.userId > User.id
+
+Ref: Attendance.applicantId > Applicant.id
+
+Ref: Attendance.teacherId > Teacher.id
+
+Ref: Schedule.roomId > MapRoom.id
+
+Ref: Schedule.teacherId > Teacher.id
+
+Ref: MapRoom.campusMapId > CampusMap.id

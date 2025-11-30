@@ -21,7 +21,7 @@ export class StudentsService {
     });
   }
 
-  async findAll() {
+  async findAll(page : number, limit : number, search: string) {
     return this.prisma.student.findMany({
       orderBy: { createdAt: 'desc' },
     });

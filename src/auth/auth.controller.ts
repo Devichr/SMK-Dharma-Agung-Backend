@@ -1,27 +1,18 @@
-// backend/src/auth/auth.controller.ts
-import {
-  Controller,
-  Post,
-  Body,
-  HttpCode,
-  HttpStatus,
-  UseGuards,
-  Get,
-  Request,
-} from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { Controller, Post, Body, UseGuards, Get, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { Public } from './decorators/public.decorator';
 
-@ApiTags('Auth')
+@ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {}
 
+  @Public()
   @Post('login')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Login user (Admin, Teacher, Applicant)' })
+  @ApiOperation({ summary: 'User login' })
   @ApiResponse({
     status: 200,
     description: 'Login successful',
@@ -30,7 +21,7 @@ export class AuthController {
         access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
         user: {
           id: 1,
-          email: 'admin@example.com',
+          email: 'user@example.com',
           role: 'ADMIN',
         },
       },
@@ -41,9 +32,9 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
+  @Public()
   @Post('register')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register new user (Admin, Teacher, Applicant)' })
+  @ApiOperation({ summary: 'User registration' })
   @ApiResponse({
     status: 201,
     description: 'Registration successful',
@@ -51,14 +42,14 @@ export class AuthController {
       example: {
         access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
         user: {
-          id: 2,
-          email: 'newuser@example.com',
+          id: 1,
+          email: 'user@example.com',
           role: 'APPLICANT',
         },
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Email already exists' })
+  @ApiResponse({ status: 400, description: 'Bad Request - Email already exists or validation error' })
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
@@ -69,16 +60,10 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({
     status: 200,
-    description: 'Profile retrieved',
-    schema: {
-      example: {
-        id: 1,
-        email: 'admin@example.com',
-        role: 'ADMIN',
-      },
-    },
+    description: 'Return current user profile',
   })
-  getProfile(@Request() req) {
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getProfile(@Request() req) {
     return req.user;
   }
 }

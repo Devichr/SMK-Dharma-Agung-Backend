@@ -12,6 +12,7 @@ enum Role {
   ADMIN
   TEACHER
   APPLICANT
+  STUDENT
 }
 
 enum StatusPpdb {
@@ -24,6 +25,7 @@ enum AttendanceStatus {
   PRESENT
   ABSENT
   EXCUSED
+  LATE
 }
 
 enum RoomType {
@@ -37,38 +39,46 @@ enum RoomType {
   OTHER
 }
 
+enum GradeLevel {
+  GRADE_10  // Kelas X
+  GRADE_11  // Kelas XI
+  GRADE_12  // Kelas XII
+}
+
 // ================ MODEL UTAMA ================
 
 model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
-  password  String // hashed
+  password  String   // hashed
   role      Role
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relasi ke role spesifik — HANYA definisi relasi, TANPA fields/references
-  admin   Admin? @relation
-  adminId Int?   @unique
+  // Relasi ke role spesifik
+  admin     Admin?
+  teacher   Teacher?
+  applicant Applicant?
+  student   Student?
+  staff     Staff?
 
-  teacher   Teacher? @relation
-  teacherId Int?     @unique
-
-  applicant   Applicant? @relation
-  applicantId Int?       @unique
-
-  students Student[]
-
-  staffs Staff[]
+  @@index([email])
+  @@index([role])
 }
 
 // ================ ADMIN ================
 model Admin {
-  id     Int    @id @default(autoincrement())
-  name   String
-  nip    String @unique
-  user   User   @relation(fields: [userId], references: [id])
-  userId Int    @unique
+  id        Int      @id @default(autoincrement())
+  name      String
+  nip       String   @unique
+  phone     String?
+  address   String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int      @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([nip])
 }
 
 // ================ GURU ================
@@ -78,13 +88,16 @@ model Teacher {
   nip       String   @unique
   phone     String?
   address   String?
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    Int      @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  schedules  Schedule[]
-  Attendance Attendance[]
+  schedules    Schedule[]
+  attendances  Attendance[]
+  gradeClasses GradeClass[] @relation("GradeClassHomeroom") // Wali kelas
+
+  @@index([nip])
 }
 
 // ================ CALON SISWA (PPDB) ================
@@ -98,72 +111,154 @@ model Applicant {
   schoolOrigin String
   status       StatusPpdb @default(PENDING)
   registeredAt DateTime   @default(now())
-  documents    String? // JSON string or comma-separated paths
+  documents    String?    // JSON string or comma-separated paths
   feedback     String?
+  user         User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       Int?       @unique
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
-  user   User? @relation(fields: [userId], references: [id])
-  userId Int?  @unique
-
-  attendances Attendance[]
+  @@index([nisn])
+  @@index([status])
 }
 
+// ================ SISWA AKTIF ================
 model Student {
-  id            Int       @id @default(autoincrement())
+  id            Int      @id @default(autoincrement())
   name          String
-  nisn          String    @unique
+  nisn          String   @unique
   phone         String
   address       String
   birthDate     DateTime
-  schoolOrigin  String    // Asal sekolah SMP
-  userId        Int?      @unique
-  user          User?     @relation(fields: [userId], references: [id])
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  schoolOrigin  String   // Asal sekolah SMP
+  enrollmentYear Int     // Tahun masuk (contoh: 2024)
+  
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        Int?     @unique
+  
+  // Relasi ke kelas
+  gradeClass    GradeClass? @relation(fields: [gradeClassId], references: [id])
+  gradeClassId  Int?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  // Relasi ke absensi, jadwal, dll (jika perlu)
+  // Relasi ke absensi
   attendances   Attendance[]
+
+  @@index([nisn])
+  @@index([gradeClassId])
+  @@index([enrollmentYear])
 }
 
+// ================ STAFF ================
 model Staff {
-  id        Int      @id @default(autoincrement())
-  name      String
-  employeeId String  @unique
-  position  String?
-  phone     String?
-  address   String?
-  user      User?    @relation(fields: [userId], references: [id])
-  userId    Int?     @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  name       String
+  employeeId String   @unique
+  position   String?
+  phone      String?
+  address    String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     Int?     @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([employeeId])
+}
+
+// ================ KELAS (GRADE) ================
+model GradeClass {
+  id          Int        @id @default(autoincrement())
+  name        String     // Contoh: "X-1", "XI IPA 2", "XII IPS 1"
+  gradeLevel  GradeLevel // GRADE_10, GRADE_11, GRADE_12
+  academicYear String    // Contoh: "2024/2025"
+  capacity    Int        @default(30)
+  
+  // Wali kelas
+  homeroom    Teacher?   @relation("GradeClassHomeroom", fields: [homeroomId], references: [id])
+  homeroomId  Int?
+  
+  // Ruang kelas
+  classroom   MapRoom?   @relation(fields: [classroomId], references: [id])
+  classroomId Int?
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relasi
+  students    Student[]
+  schedules   Schedule[]
+
+  @@unique([name, academicYear]) // Nama kelas + tahun ajaran harus unik
+  @@index([gradeLevel])
+  @@index([academicYear])
+  @@index([homeroomId])
+  @@index([classroomId])
 }
 
 // ================ ABSENSI ================
 model Attendance {
-  id     Int              @id @default(autoincrement())
-  date   DateTime         @default(now())
-  status AttendanceStatus @default(PRESENT)
+  id        Int              @id @default(autoincrement())
+  date      DateTime         @default(now())
+  status    AttendanceStatus @default(PRESENT)
+  notes     String?          // Catatan tambahan (alasan izin/sakit, dll)
 
-  applicant   Applicant @relation(fields: [applicantId], references: [id])
-  applicantId Int
+  // Relasi ke siswa
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId Int
 
-  teacher   Teacher @relation(fields: [teacherId], references: [id])
+  // Relasi ke guru yang mencatat
+  teacher   Teacher  @relation(fields: [teacherId], references: [id])
   teacherId Int
 
-  students Student[]
+  // Relasi ke jadwal (opsional - untuk absensi per mata pelajaran)
+  schedule   Schedule? @relation(fields: [scheduleId], references: [id])
+  scheduleId Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, date, scheduleId]) // Satu siswa hanya bisa punya 1 absensi per hari per jadwal
+  @@index([date])
+  @@index([studentId])
+  @@index([teacherId])
+  @@index([status])
 }
 
 // ================ JADWAL ================
 model Schedule {
   id      Int    @id @default(autoincrement())
-  day     Int // 1=Monday, ..., 6=Saturday
-  period  Int // Period number (1st hour, 2nd hour, etc.)
-  subject String
+  day     Int    // 1=Monday, ..., 6=Saturday
+  period  Int    // Period number (1st hour, 2nd hour, etc.)
+  subject String // Mata pelajaran
+  
+  // Waktu mulai dan selesai
+  startTime String // Format: "07:00"
+  endTime   String // Format: "08:30"
 
+  // Relasi ke kelas
+  gradeClass   GradeClass @relation(fields: [gradeClassId], references: [id], onDelete: Cascade)
+  gradeClassId Int
+
+  // Relasi ke ruangan
   room   MapRoom? @relation(fields: [roomId], references: [id])
   roomId Int?
 
+  // Relasi ke guru
   teacher   Teacher @relation(fields: [teacherId], references: [id])
   teacherId Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relasi ke absensi
+  attendances Attendance[]
+
+  @@unique([gradeClassId, day, period]) // Satu kelas tidak bisa punya 2 jadwal di waktu yang sama
+  @@index([day])
+  @@index([teacherId])
+  @@index([gradeClassId])
 }
 
 // ================ FEEDBACK (dari publik) ================
@@ -171,35 +266,48 @@ model Feedback {
   id        Int      @id @default(autoincrement())
   name      String
   email     String?
-  message   String
+  message   String   @db.Text
+  isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([isRead])
+  @@index([createdAt])
 }
 
 // ================ DENAH SEKOLAH (CAMPUS MAP) ================
 model CampusMap {
   id         Int      @id @default(autoincrement())
   name       String   @default("Denah Utama")
-  svgPath    String // e.g., "/uploads/maps/school.svg"
+  svgPath    String   // e.g., "/uploads/maps/school.svg"
   uploadedAt DateTime @default(now())
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   rooms MapRoom[]
+
+  @@index([isActive])
 }
 
 // ================ RUANGAN DI DENAH ================
 model MapRoom {
   id          Int      @id @default(autoincrement())
-  roomId      String // Harus sesuai dengan `id` elemen di SVG (e.g., "class-101")
+  roomId      String   // Harus sesuai dengan `id` elemen di SVG (e.g., "class-101")
   name        String
   type        RoomType @default(OTHER)
   capacity    Int      @default(0)
-  description String?
-  metadata    Json? // Optional: { x: 120, y: 200, color: "#3b82f6" }
+  floor       Int      @default(1) // Lantai berapa
+  building    String?  // Gedung (contoh: "Gedung A", "Gedung B")
+  description String?  @db.Text
+  metadata    Json?    // Optional: { x: 120, y: 200, color: "#3b82f6" }
 
-  campusMap   CampusMap @relation(fields: [campusMapId], references: [id])
+  campusMap   CampusMap @relation(fields: [campusMapId], references: [id], onDelete: Cascade)
   campusMapId Int
 
-  schedules Schedule[]
+  schedules    Schedule[]
+  gradeClasses GradeClass[]
+
+  @@unique([campusMapId, roomId]) // roomId harus unik per denah
+  @@index([type])
+  @@index([campusMapId])
 }

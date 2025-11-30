@@ -27,15 +27,15 @@ export class StaffService {
   }
 
   async findOne(id: number) {
-    const student = await this.prisma.staff.findUnique({
+    const staff = await this.prisma.staff.findUnique({
       where: { id },
     });
 
-    if (!student) {
-      throw new NotFoundException(`Student with id ${id} not found`);
+    if (!staff) {
+      throw new NotFoundException(`Staff with id ${id} not found`);
     }
 
-    return student;
+    return staff;
   }
 
   async update(id: number, dto: UpdateStaffDto) {
@@ -56,7 +56,7 @@ export class StaffService {
 
   async remove(id: number) {
     await this.findOne(id);
-    return this.prisma.student.delete({
+    return this.prisma.staff.delete({
       where: { id },
     });
   }
