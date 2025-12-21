@@ -39,6 +39,13 @@ enum RoomType {
   OTHER
 }
 
+enum TimePreference {
+  MORNING    // 07:00 - 10:00
+  MIDDAY     // 10:00 - 13:00
+  AFTERNOON  // 13:00 - 16:00
+  ANY        // No preference
+}
+
 enum GradeLevel {
   GRADE_10  // Kelas X
   GRADE_11  // Kelas XI
@@ -93,9 +100,11 @@ model Teacher {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  schedules    Schedule[]
-  attendances  Attendance[]
-  gradeClasses GradeClass[] @relation("GradeClassHomeroom") // Wali kelas
+  schedules        Schedule[]
+  attendances      Attendance[]
+  gradeClasses     GradeClass[] @relation("GradeClassHomeroom") // Wali kelas
+  teacherSubjects  TeacherSubject[] // Many-to-many dengan Subject
+  preference TeacherPreference?
 
   @@index([nip])
 }
@@ -111,17 +120,59 @@ model Applicant {
   schoolOrigin String
   status       StatusPpdb @default(PENDING)
   registeredAt DateTime   @default(now())
-  documents    String?    // JSON string or comma-separated paths
   feedback     String?
   user         User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId       Int?       @unique
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  
+  // Profile Lengkap (nullable karena diisi setelah registrasi)
+  gender              String?      // "MALE" / "FEMALE"
+  birthPlace          String?
+  fullAddress         String?
+  postalCode          String?
+  ijazahNumber        String?
+  ijazahYear          Int?
+  skhunNumber         String?
+  desiredMajor        String?      // "IPA" / "IPS" / "Bahasa"
+  bloodType           String?      // "A" / "B" / "AB" / "O"
+  childPosition       Int?         // Anak ke-
+  totalSiblings       Int?         // Dari berapa bersaudara
+  hobby               String?
+  height              Float?       // Tinggi badan (cm)
+  weight              Float?       // Berat badan (kg)
+  achievements        String?      @db.Text // JSON array
+  
+  // Data Orang Tua
+  livingWith          String?      // "PARENTS" / "GUARDIAN"
+  motherName          String?
+  fatherName          String?
+  motherOccupation    String?
+  fatherOccupation    String?
+  parentsPhone        String?
+  fatherIncome        String?      // Range: "< 1jt", "1-3jt", etc
+  motherIncome        String?
+  
+  // Data Wali (jika tinggal dengan wali)
+  guardianName        String?
+  guardianOccupation  String?
+  guardianAddress     String?
+  guardianPhone       String?
+  guardianIncome      String?
+  
+  // Upload Dokumen (store file paths)
+  sttbFile            String?      // STTB SMP
+  skhunFile           String?      // SKHUN SMP
+  birthCertFile       String?      // Akte Kelahiran
+  photoFile           String?      // Pas foto
+  ijazahFile          String?      // Ijazah/Bukti Kelulusan
+  achievementFiles    Json?        // Array of achievement file paths
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   @@index([nisn])
   @@index([status])
+  @@index([userId])
 }
-
 // ================ SISWA AKTIF ================
 model Student {
   id            Int      @id @default(autoincrement())
@@ -167,6 +218,105 @@ model Staff {
   @@index([employeeId])
 }
 
+// ================ MATA PELAJARAN ================
+model Subject {
+  id          Int        @id @default(autoincrement())
+  name        String     // Nama mata pelajaran (e.g., "Matematika", "Bahasa Indonesia")
+  code        String     @unique // Kode mata pelajaran (e.g., "MAT", "BIN")
+  description String?    @db.Text
+  category    String?    // Kategori: "Wajib", "Peminatan", "Lintas Minat"
+  
+  // Grade Level - untuk menentukan subject ini untuk kelas berapa
+  gradeLevel  GradeLevel // GRADE_10, GRADE_11, atau GRADE_12
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relasi ke jadwal
+  schedules        Schedule[]
+  teacherSubjects  TeacherSubject[] // Many-to-many dengan Teacher
+  subjectHours SubjectHours[]
+
+  @@unique([code, gradeLevel]) // Kode + grade level harus unik (misal: MAT untuk Grade 10, MAT untuk Grade 11)
+  @@index([code])
+  @@index([category])
+  @@index([gradeLevel])
+}
+
+// ================ JUNCTION TABLE: GURU <-> MATA PELAJARAN ================
+model TeacherSubject {
+  id        Int      @id @default(autoincrement())
+  
+  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacherId Int
+  
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId Int
+  
+  // Metadata tambahan (opsional)
+  isPrimary Boolean  @default(false) // Apakah guru ini pengampu utama untuk mata pelajaran ini
+  assignedAt DateTime @default(now())
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([teacherId, subjectId]) // Satu guru tidak bisa di-assign ke mata pelajaran yang sama 2x
+  @@index([teacherId])
+  @@index([subjectId])
+}
+
+model SchoolTimeConfig {
+  id               Int      @id @default(autoincrement())
+  academicYear     String   @unique
+  schoolStartTime  String   // e.g., "07:00"
+  schoolEndTime    String   // e.g., "16:00"
+  periodDuration   Int      // dalam menit, e.g., 45
+  breakDuration    Int      // dalam menit, e.g., 15
+  maxPeriodsPerDay Int      // maksimal jam pelajaran per hari
+  
+  // Break times - JSON array of { afterPeriod: number, duration: number }
+  // e.g., [{ afterPeriod: 2, duration: 20 }, { afterPeriod: 5, duration: 30 }]
+  breakTimes       Json     
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@index([academicYear])
+}
+
+// Jam pelajaran per subject
+model SubjectHours {
+  id               Int      @id @default(autoincrement())
+  subject          Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId        Int
+  gradeClass       GradeClass @relation(fields: [gradeClassId], references: [id], onDelete: Cascade)
+  gradeClassId     Int
+  
+  hoursPerWeek     Int      // Jam pelajaran per minggu untuk subject ini
+  preferredDays    Json?    // Optional: [1,2,3] = prefer Monday, Tuesday, Wednesday
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@unique([subjectId, gradeClassId])
+  @@index([subjectId])
+  @@index([gradeClassId])
+}
+
+model TeacherPreference {
+  id              Int            @id @default(autoincrement())
+  teacher         Teacher        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacherId       Int            @unique
+  
+  timePreference  TimePreference @default(ANY)
+  maxHoursPerDay  Int            @default(8)
+  maxHoursPerWeek Int            @default(40)
+  unavailableDays Json?          // Array of days: [1,3] = Monday, Wednesday
+  
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
 // ================ KELAS (GRADE) ================
 model GradeClass {
   id          Int        @id @default(autoincrement())
@@ -189,6 +339,7 @@ model GradeClass {
   // Relasi
   students    Student[]
   schedules   Schedule[]
+  subjectHours SubjectHours[]
 
   @@unique([name, academicYear]) // Nama kelas + tahun ajaran harus unik
   @@index([gradeLevel])
@@ -231,11 +382,14 @@ model Schedule {
   id      Int    @id @default(autoincrement())
   day     Int    // 1=Monday, ..., 6=Saturday
   period  Int    // Period number (1st hour, 2nd hour, etc.)
-  subject String // Mata pelajaran
   
   // Waktu mulai dan selesai
   startTime String // Format: "07:00"
   endTime   String // Format: "08:30"
+
+  // Relasi ke mata pelajaran
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId Int
 
   // Relasi ke kelas
   gradeClass   GradeClass @relation(fields: [gradeClassId], references: [id], onDelete: Cascade)
@@ -259,6 +413,7 @@ model Schedule {
   @@index([day])
   @@index([teacherId])
   @@index([gradeClassId])
+  @@index([subjectId])
 }
 
 // ================ FEEDBACK (dari publik) ================
