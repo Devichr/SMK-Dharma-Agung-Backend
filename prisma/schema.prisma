@@ -22,10 +22,10 @@ enum StatusPpdb {
 }
 
 enum AttendanceStatus {
-  PRESENT
-  ABSENT
-  EXCUSED
-  LATE
+  HADIR
+  SAKIT
+  IZIN
+  ALPHA
 }
 
 enum RoomType {
@@ -148,15 +148,15 @@ model Applicant {
   motherOccupation    String?
   fatherOccupation    String?
   parentsPhone        String?
-  fatherIncome        String?      // Range: "< 1jt", "1-3jt", etc
-  motherIncome        String?
+  fatherIncome        Int?      // Range: "< 1jt", "1-3jt", etc
+  motherIncome        Int?
   
   // Data Wali (jika tinggal dengan wali)
   guardianName        String?
   guardianOccupation  String?
   guardianAddress     String?
   guardianPhone       String?
-  guardianIncome      String?
+  guardianIncome      Int?
   
   // Upload Dokumen (store file paths)
   sttbFile            String?      // STTB SMP
@@ -241,6 +241,7 @@ model Subject {
   @@index([code])
   @@index([category])
   @@index([gradeLevel])
+  attendances Attendance[]
 }
 
 // ================ JUNCTION TABLE: GURU <-> MATA PELAJARAN ================
@@ -346,13 +347,14 @@ model GradeClass {
   @@index([academicYear])
   @@index([homeroomId])
   @@index([classroomId])
+  attendances Attendance[]
 }
 
 // ================ ABSENSI ================
 model Attendance {
   id        Int              @id @default(autoincrement())
   date      DateTime         @default(now())
-  status    AttendanceStatus @default(PRESENT)
+  status    AttendanceStatus @default(HADIR)
   notes     String?          // Catatan tambahan (alasan izin/sakit, dll)
 
   // Relasi ke siswa
@@ -367,10 +369,16 @@ model Attendance {
   schedule   Schedule? @relation(fields: [scheduleId], references: [id])
   scheduleId Int?
 
+    subjectId   Int
+  subject     Subject  @relation(fields: [subjectId], references: [id])
+  
+  gradeClassId Int
+  gradeClass   GradeClass @relation(fields: [gradeClassId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([studentId, date, scheduleId]) // Satu siswa hanya bisa punya 1 absensi per hari per jadwal
+  @@unique([studentId, date, subjectId]) // Satu siswa hanya bisa punya 1 absensi per hari per jadwal
   @@index([date])
   @@index([studentId])
   @@index([teacherId])

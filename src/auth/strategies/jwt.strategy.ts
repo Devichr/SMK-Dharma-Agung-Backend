@@ -13,11 +13,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: any) {
-    return {
-      id: payload.sub,
-      email: payload.email,
-      role: payload.role,
-    };
-  }
+async validate(payload: any) {
+  console.log('=== JWT PAYLOAD ===');
+  console.log(payload);
+  
+  const user = { 
+    userId: payload.sub, 
+    email: payload.email, 
+    role: payload.role,
+    teacherId: payload.teacherId,
+    adminId: payload.adminId,
+    applicantId: payload.applicantId,
+    studentId: payload.studentId,
+  };
+  
+  console.log('=== RETURNING USER FROM JWT STRATEGY ===');
+  console.log(user);
+  
+  return user;
+}
 }

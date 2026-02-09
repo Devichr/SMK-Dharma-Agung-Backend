@@ -84,13 +84,13 @@ export class CompleteProfileDto {
   @IsOptional()
   parentsPhone?: string;
 
-  @IsString()
+  @IsInt()
   @IsOptional()
-  fatherIncome?: string;
+  fatherIncome?: number;
 
-  @IsString()
+  @IsInt()
   @IsOptional()
-  motherIncome?: string;
+  motherIncome?: number;
 
   // Data Wali (required jika livingWith = GUARDIAN)
   @IsString()
@@ -109,9 +109,9 @@ export class CompleteProfileDto {
   @IsOptional()
   guardianPhone?: string;
 
-  @IsString()
+  @IsInt()
   @IsOptional()
-  guardianIncome?: string;
+  guardianIncome?: number;
 
   // Achievements (JSON)
   @IsArray()

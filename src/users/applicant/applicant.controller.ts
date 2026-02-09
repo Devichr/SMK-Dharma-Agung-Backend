@@ -13,11 +13,12 @@ import {
   UploadedFile,
   ParseIntPipe,
   BadRequestException,
+  Res,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
-import { Multer } from'multer';
+import { Multer } from 'multer';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/roles.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
@@ -37,14 +38,14 @@ const storage = diskStorage({
 
 const fileFilter = (req: any, file: any, cb: any) => {
   // Allow images and PDFs
-  if (
-    file.mimetype.match(/\/(jpg|jpeg|png|pdf)$/)
-  ) {
+  if (file.mimetype.match(/\/(jpg|jpeg|png|pdf)$/)) {
     cb(null, true);
   } else {
     cb(
-      new BadRequestException('Only image files (jpg, jpeg, png) and PDF are allowed'),
-      false
+      new BadRequestException(
+        'Only image files (jpg, jpeg, png) and PDF are allowed',
+      ),
+      false,
     );
   }
 };
@@ -54,69 +55,81 @@ export class ApplicantController {
   constructor(private applicantService: ApplicantService) {}
 
   // ========================================
-  // APPLICANT ROUTES (Authenticated)
+  // APPLICANT & STUDENT ROUTES (Authenticated)
   // ========================================
 
   @Get('me')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('APPLICANT')
+  @Roles('APPLICANT', 'STUDENT')
   async getMyProfile(@Request() req) {
-    return this.applicantService.getMyProfile(req.user.id);
+    // ✅ Gunakan req.user.userId, bukan req.user.id
+    return this.applicantService.getMyProfile(req.user.userId);
   }
 
   @Put('complete-profile')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('APPLICANT')
+  @Roles('APPLICANT', 'STUDENT')
   async completeProfile(@Request() req, @Body() dto: CompleteProfileDto) {
-    return this.applicantService.completeProfile(req.user.id, dto);
+    // ✅ Gunakan req.user.userId, bukan req.user.id
+    return this.applicantService.completeProfile(req.user.userId, dto);
   }
 
   @Post('upload/:documentType')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('APPLICANT')
+  @Roles('APPLICANT', 'STUDENT')
   @UseInterceptors(
     FileInterceptor('file', {
       storage,
       fileFilter,
       limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-    })
+    }),
   )
   async uploadDocument(
     @Request() req,
     @Param('documentType') documentType: string,
-    @UploadedFile() file: Multer.File
+    @UploadedFile() file: Multer.File,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
 
-    const validTypes = ['sttb', 'skhun', 'birth_cert', 'photo', 'ijazah', 'achievement'];
+    const validTypes = [
+      'sttb',
+      'skhun',
+      'birth_cert',
+      'photo',
+      'ijazah',
+      'achievement',
+    ];
     if (!validTypes.includes(documentType)) {
       throw new BadRequestException('Invalid document type');
     }
 
+    // ✅ Gunakan req.user.userId, bukan req.user.id
     return this.applicantService.uploadDocument(
-      req.user.id,
+      req.user.userId,
       documentType,
-      file.path
+      file.path,
     );
   }
 
   @Delete('achievement-file/:index')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('APPLICANT')
+  @Roles('APPLICANT', 'STUDENT')
   async deleteAchievementFile(
     @Request() req,
-    @Param('index', ParseIntPipe) index: number
+    @Param('index', ParseIntPipe) index: number,
   ) {
-    return this.applicantService.deleteAchievementFile(req.user.id, index);
+    // ✅ Gunakan req.user.userId, bukan req.user.id
+    return this.applicantService.deleteAchievementFile(req.user.userId, index);
   }
 
   @Get('check-completion')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('APPLICANT')
+  @Roles('APPLICANT', 'STUDENT')
   async checkProfileCompletion(@Request() req) {
-    return this.applicantService.checkProfileCompletion(req.user.id);
+    // ✅ Gunakan req.user.userId, bukan req.user.id
+    return this.applicantService.checkProfileCompletion(req.user.userId);
   }
 
   // ========================================
@@ -129,7 +142,7 @@ export class ApplicantController {
   async getAllApplicants(
     @Query('status') status?: 'PENDING' | 'ACCEPTED' | 'REJECTED',
     @Query('search') search?: string,
-    @Query('desiredMajor') desiredMajor?: string
+    @Query('desiredMajor') desiredMajor?: string,
   ) {
     return this.applicantService.getAllApplicants({
       status,
@@ -157,7 +170,7 @@ export class ApplicantController {
   @Roles('ADMIN')
   async updateStatus(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateStatusDto
+    @Body() dto: UpdateStatusDto,
   ) {
     return this.applicantService.updateStatus(id, dto);
   }
@@ -167,11 +180,18 @@ export class ApplicantController {
   @Roles('ADMIN')
   async acceptAndConvertToStudent(
     @Param('id', ParseIntPipe) applicantId: number,
-    @Body('gradeClassId', ParseIntPipe) gradeClassId: number
+    @Body('gradeClassId', ParseIntPipe) gradeClassId: number,
   ) {
     return this.applicantService.acceptAndConvertToStudent(
       applicantId,
-      gradeClassId
+      gradeClassId,
     );
+  }
+
+  @Get('me/download-form')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('APPLICANT', 'STUDENT')
+  async downloadRegistrationForm(@Request() req, @Res() res) {
+    return this.applicantService.generateRegistrationPDF(req.user.userId, res);
   }
 }
