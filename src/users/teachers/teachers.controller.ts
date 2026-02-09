@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
   Post,
@@ -68,6 +70,30 @@ export class TeacherController {
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateTeacherDto) {
     return this.teacherService.update(id, dto);
   }
+
+  @Get(':id/subjects')
+  getSubjects(@Param('id', ParseIntPipe) id: number) {
+    return this.teacherService.getSubjects(id);
+  }
+
+  @Post(':id/subjects/:subjectId')
+  assignSubject(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('subjectId', ParseIntPipe) subjectId: number,
+    @Body('isPrimary') isPrimary?: boolean,
+  ) {
+    return this.teacherService.assignSubject(id, subjectId, isPrimary);
+  }
+
+  @Delete(':id/subjects/:subjectId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeSubject(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('subjectId', ParseIntPipe) subjectId: number,
+  ) {
+    return this.teacherService.removeSubject(id, subjectId);
+  }
+
 
   // SOFT DELETE TEACHER
   @Delete(':id')
